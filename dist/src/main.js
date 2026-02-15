@@ -6,7 +6,7 @@ const app_module_1 = require("./app.module");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.enableCors({
-        origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+        origin: ['https://xcyber360-frontend.vercel.app', 'http://localhost:5173'],
         credentials: true,
     });
     app.setGlobalPrefix('api');
