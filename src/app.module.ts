@@ -13,6 +13,7 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
+    
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     MailModule,
@@ -22,6 +23,7 @@ import { AppController } from './app.controller';
     CustomerModule,
     AssessmentPublicModule,
   ],
+  
   controllers: [AppController],  // 👈 ADD THIS
 
   providers: [
