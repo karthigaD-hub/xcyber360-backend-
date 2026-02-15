@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= ENUMS =============
+enum UserRole {
+  ADMIN
+  AGENT
+  CUSTOMER
+}
+
+enum QuestionType {
+  YES_NO
+  MCQ
+  TEXT
+  NUMBER
+  REFLEXIVE
+  PARAGRAPH
+  CHECKBOX
+}
+
+enum AssessmentStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum LinkStatus {
+  YET_TO_START
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum FilledBy {
+  USER
+  AGENT
+}
+
+// ============= TABLES =============
+
+model Admin {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  password             String
+  must_change_password Boolean  @default(false)
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Agent {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  password             String
+  phone                String?
+  designation          String?
+  emp_id               String?
+  is_active            Boolean  @default(true)
+  must_change_password Boolean  @default(true)
+  failed_login_attempts Int     @default(0)
+  account_locked_until DateTime?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  customers        Customer[]
+  assessment_links AssessmentLink[]
+
+  @@map("agents")
+}
+
+model Customer {
+  id                   String   @id @default(uuid())
+  name                 String
+  company_name         String
+  email                String   @unique
+  phone                String?
+  industry             String?
+  password             String
+  must_change_password Boolean  @default(true)
+  is_active            Boolean  @default(true)
+  failed_login_attempts Int     @default(0)
+  account_locked_until DateTime?
+  agent_id             String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  agent            Agent?           @relation(fields: [agent_id], references: [id], onDelete: SetNull)
+  assessment_links AssessmentLink[]
+
+  @@index([agent_id])
+  @@map("customers")
+}
+
+model InsuranceProvider {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  code          String   @unique
+  contact_email String?
+  contact_phone String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  question_providers QuestionProvider[]
+  assessment_links   AssessmentLink[]
+
+  @@map("insurance_providers")
+}
+
+model Compartment {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String?
+  order          Int      @default(0)
+  question_range String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  questions Question[]
+
+  @@map("compartments")
+}
+
+model Question {
+  id             String       @id @default(uuid())
+  question_text  String
+  question_type  QuestionType
+  options        String[]     @default([])
+  compartment_id String
+  risk_weight    Int          @default(5)
+  is_active      Boolean      @default(true)
+  order          Int          @default(0)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  compartment          Compartment          @relation(fields: [compartment_id], references: [id], onDelete: Cascade)
+  applicable_providers QuestionProvider[]
+  assessment_questions AssessmentQuestion[]
+  response_answers     ResponseAnswer[]
+
+  @@index([compartment_id])
+  @@index([is_active])
+  @@map("questions")
+}
+
+model QuestionProvider {
+  id                    String @id @default(uuid())
+  question_id           String
+  insurance_provider_id String
+
+  question           Question          @relation(fields: [question_id], references: [id], onDelete: Cascade)
+  insurance_provider InsuranceProvider  @relation(fields: [insurance_provider_id], references: [id], onDelete: Cascade)
+
+  @@unique([question_id, insurance_provider_id])
+  @@map("question_providers")
+}
+
+model Assessment {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  status      AssessmentStatus @default(DRAFT)
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+
+  assessment_questions AssessmentQuestion[]
+  assessment_links     AssessmentLink[]
+
+  @@map("assessments")
+}
+
+model AssessmentQuestion {
+  id            String @id @default(uuid())
+  assessment_id String
+  question_id   String
+  order         Int    @default(0)
+
+  assessment Assessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([assessment_id, question_id])
+  @@index([assessment_id])
+  @@map("assessment_questions")
+}
+
+model AssessmentLink {
+  id                    String     @id @default(uuid())
+  assessment_id         String
+  customer_id           String
+  insurance_provider_id String
+  agent_id              String?
+  token                 String     @unique @default(uuid())
+  status                LinkStatus @default(YET_TO_START)
+  progress_percent      Int        @default(0)
+  submitted_at          DateTime?
+  created_at            DateTime   @default(now())
+  updated_at            DateTime   @updatedAt
+
+  assessment         Assessment        @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+  customer           Customer          @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  insurance_provider InsuranceProvider  @relation(fields: [insurance_provider_id], references: [id], onDelete: Cascade)
+  agent              Agent?            @relation(fields: [agent_id], references: [id], onDelete: SetNull)
+  response           Response?
+
+  @@index([assessment_id])
+  @@index([customer_id])
+  @@index([agent_id])
+  @@index([token])
+  @@map("assessment_links")
+}
+
+model Response {
+  id                 String   @id @default(uuid())
+  assessment_link_id String   @unique
+  filled_by          FilledBy @default(USER)
+  submitted_by       FilledBy @default(USER)
+  consent_confirmed  Boolean  @default(false)
+  is_submitted       Boolean  @default(false)
+  submitted_at       DateTime?
+  ip_address         String?
+  user_agent         String?
+  created_at         DateTime @default(now())
+
+  assessment_link AssessmentLink @relation(fields: [assessment_link_id], references: [id], onDelete: Cascade)
+  answers         ResponseAnswer[]
+
+  @@map("responses")
+}
+
+model ResponseAnswer {
+  id          String @id @default(uuid())
+  response_id String
+  question_id String
+  answer      String
+
+  response Response @relation(fields: [response_id], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([response_id, question_id])
+  @@index([response_id])
+  @@map("response_answers")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  entity_type    String
+  entity_id      String
+  performed_by   String
+  performer_role String
+  details        String?
+  ip_address     String?
+  user_agent     String?
+  created_at     DateTime @default(now())
+
+  @@index([entity_type, entity_id])
+  @@index([performed_by])
+  @@index([created_at])
+  @@map("audit_logs")
+}
