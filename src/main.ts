@@ -7,7 +7,7 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-  origin: ['https://xcyber360-frontend.vercel.app', 'http://localhost:5173'],
+  origin: ['https://your-frontend.vercel.app'],
   credentials: true,
 });
 
