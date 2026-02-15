@@ -7,9 +7,10 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-    credentials: true,
-  });
+  origin: ['https://your-frontend.vercel.app'],
+  credentials: true,
+});
+
 
   // Global prefix
   app.setGlobalPrefix('api');
